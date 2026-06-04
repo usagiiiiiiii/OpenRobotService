@@ -50,3 +50,6 @@ logs/
 
 # ===== Claude Code 本地设置 =====
 .claude/settings.local.json
+
+# ===== 临时 / 草稿（如 logo 草稿、导出中间文件）=====
+old/
