@@ -1944,69 +1944,10 @@ def _kb_build() -> dict:
             brands = {_brand_agg(c) for c in n["children"]}
             brands.discard("")
             n["brand"] = brands.pop() if len(brands) == 1 else "混合"
-            return ""
+            return n["brand"]
         _brand_agg(root)
 
-        # 公司域：品牌优先分组（0916 用户定稿——公司树第一层 自研车/华睿/科钛/通用/产品目录）。
-        # 纯视图层重排：文件不动、sub_domain 不动、检索零影响；文件节点带 path 供预览。
-        if d == "company":
-            file_list = []
-            def _collect_files(n, prefix):
-                if not n["dir"]:
-                    file_list.append((prefix + n["name"], n))
-                    return
-                for c in n["children"]:
-                    _collect_files(c, prefix + n["name"] + "/")
-            for c0 in root["children"]:
-                _collect_files(c0, "")
-            group_order = ["自研车", "华睿", "科钛", "通用", "产品目录"]
-            gbrand = {"自研车": "自研", "华睿": "华睿", "科钛": "科钛",
-                      "通用": "通用", "产品目录": "自研"}
-            groups = {g: {"name": g, "dir": True, "chunks": 0, "files": 0,
-                          "children": [], "cn": g, "label": "", "brand": gbrand[g],
-                          "path": ""} for g in group_order}
-            for rel, node in file_list:
-                b = node.get("brand", "通用")
-                if rel.startswith("product_catalog/"):
-                    gname, inner = "产品目录", rel[len("product_catalog/"):]
-                elif b == "华睿":
-                    gname = "华睿"
-                    inner = rel[len("vehicle_implementation/"):] if rel.startswith("vehicle_implementation/") else rel
-                    if inner.startswith("华睿VDA5050接入/"):  # 组名已表意，剥掉同名层
-                        inner = inner[len("华睿VDA5050接入/"):]
-                elif b == "科钛":
-                    gname = "科钛"
-                    inner = rel[len("vehicle_implementation/"):] if rel.startswith("vehicle_implementation/") else rel
-                    if inner.startswith("科钛VDA5050接入/"):
-                        inner = inner[len("科钛VDA5050接入/"):]
-                elif b == "自研":
-                    gname, inner = "自研车", rel
-                    if inner.startswith("vehicle_implementation/"):  # 组名已表意，剥掉冗余层
-                        inner = inner[len("vehicle_implementation/"):]
-                else:
-                    gname, inner = "通用", rel
-                node = dict(node)  # path 已是 KB 根相对（company/...），保留
-                cur = groups[gname]
-                for seg in inner.split("/")[:-1]:
-                    child = next((c for c in cur["children"] if c["dir"] and c["name"] == seg), None)
-                    if child is None:
-                        child = {"name": seg, "dir": True, "chunks": 0, "files": 0,
-                                 "children": [], "cn": _KB_DIR_CN.get(seg, ""), "path": ""}
-                        cur["children"].append(child)
-                    cur = child
-                cur["children"].append(node)
-            def _agg2(n):
-                if not n["dir"]:
-                    return n["chunks"], 1
-                cs = fs = 0
-                for c in n["children"]:
-                    cc, cf = _agg2(c)
-                    c["chunks"], c["files"] = cc, cf
-                    cs += cc
-                    fs += cf
-                return cs, fs
-            root["children"] = [groups[g] for g in group_order]
-            root["chunks"], root["files"] = _agg2(root)
+
         for c in root["children"]:
             if c["dir"]:
                 c["label"] = _KB_LABELS.get(f"{d}/{c['name']}", _KB_LABELS.get(c["name"], ""))
