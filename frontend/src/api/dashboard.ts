@@ -464,11 +464,70 @@ export async function fetchDashboardSummaryAll(projectIds?: string[]): Promise<D
 // （dar_weekly 读 DAR_PUSH_BASE/USER/PASS）→ 本接口给「工单数据看板」页
 // AI 直答率区块展示。摘要不含 fails 明细（含用户对话，不上服务号）。
 
+/** 六层漏斗计数（与直答率同口径：已判定三层是直答率分母） */
+export interface DarFunnelBlock {
+  total: number;        // 全部段
+  tester: number;       // 测试会话段
+  chitchat: number;     // 闲聊段
+  suggested: number;    // 推荐池混合段
+  real: number;         // 真实咨询
+  ticket: number;       // 直接转工单（旁支）
+  undetermined: number; // 未判定
+  judged: number;       // 已判定（直答率分母）
+  correct: number;      // 直答正确
+  wrong: number;        // 未直答
+  uncovered: number;    // 未覆盖
+  layers?: Record<string, number>;
+}
+
+export interface DarFailTopItem {
+  type: string; n: number;
+  wrong?: number; uncovered?: number;
+  /** 样例：k=未直答/未覆盖，q=问题首句；未覆盖只取「检索没命中」的真缺口 */
+  samples?: Array<{ k: string; q: string }>;
+}
+
 export interface DarReportSummary {
   week_date: string;
   env: string;
   /** 三口径文本（L1/L2/L3），dar_weekly 原样 */
   dar_rates: Record<string, string>;
+  /** 同分母三口径文本："29.2%（312/1069）"——分子分母就从这个原文里取 */
+  dar_rates_same_base?: Record<string, string>;
+  /** 直答率（工作台口径）：分母=漏斗已判定三层，与工作台首页那张卡同数 */
+  l2_funnel?: { base?: string; L2_人工?: string };
+  /** 上周（自然周：上周一~上周日）的同分母口径，dar_weekly 生成时算好 */
+  last_week?: {
+    from: string;
+    to: string;
+    base?: string;
+    L1_段级?: string;
+    L2_人工?: string;
+    L3_AI同段?: string;
+  };
+  /** 最近 8 个完整自然周的同分母口径（时间正序），周选择 + 趋势图 */
+  weekly_series?: Array<{
+    from: string;
+    to: string;
+    base?: string;
+    L1_段级?: string;
+    L2_人工?: string;
+    L3_AI同段?: string;
+  }>;
+  /** 六层漏斗（累计）：全部段 → 真实咨询 → 进入问答 → 已判定 */
+  funnel?: DarFunnelBlock;
+  /** 六层漏斗（按周，含本周 partial 标记） */
+  funnel_weekly?: Array<{
+    week: string;
+    label: string;
+    week_start: string;
+    partial?: boolean;
+    funnel: DarFunnelBlock;
+    /** 该周的未直答 Top 品类（切周时跟着变） */
+    fail_top?: DarFailTopItem[];
+  }>;
+  /** 未直答 Top 品类（只带类型/条数/问题样例） */
+  fail_top?: DarFailTopItem[];
   /** 环比（同分母）：{ "L2_人工": { prev, curr, delta }, ... } */
   wow: Record<string, { prev: number; curr: number; delta: number }>;
   kb_gap: string | null;
